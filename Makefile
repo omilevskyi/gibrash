@@ -53,7 +53,7 @@ CFLAGS+=	-I${LOCALBASE}/include
 
 LDFLAGS+=	-L${LOCALBASE}/lib
 
-TEST_SRCS!=	find test -name '*.c' -type f || :
+#TEST_SRCS!=	find test -name '*.c' -type f
 
 TEST_CFLAGS=	${CFLAGS:N-Wmissing-variable-declarations} -I.
 TEST_LDFLAGS=	-L${LOCALBASE}/lib -lcriterion
