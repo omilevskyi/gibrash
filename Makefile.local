@@ -1,0 +1,41 @@
+SLEEP_SEC?=	7
+
+install-home: .PHONY
+	${INSTALL} -s ${PROG} ${HOME}/bin
+
+pr: .PHONY push do-pr sleep watch
+do-pr: .PHONY
+	gh pr create --fill
+
+push: .PHONY
+	git push --verbose --set-upstream origin $$(git branch --show-current)
+
+push-force: .PHONY
+	git push --force --verbose --set-upstream origin $$(git branch --show-current)
+
+status: .PHONY .SILENT
+	gh pr status --json latestReviews,reviewDecision --jq '.currentBranch | [.reviewDecision, .latestReviews[-1].author.login, .latestReviews[-1].state] | join(" ")'
+
+sleep: .PHONY .SILENT
+	sleep ${SLEEP_SEC}
+
+watch: .PHONY .SILENT
+	main_branch="$$(git --no-pager branch --no-color --list 'ma*' | sed -rn 's,^\*?[[:space:]]+(main|master)$$,\1,p;q')"; \
+	if [ "_$$(git --no-pager branch --no-color --show-current)" = "_$${main_branch}" ]; then \
+		while [ "$${secs:=0}" -le ${SLEEP_SEC} ]; do \
+			sleep 1; \
+			run_id=$$(gh run list --branch "$${main_branch}" --event push --status in_progress --json databaseId --jq '.[0].databaseId'); \
+			test -z "$${run_id}" || break; \
+			secs=$$((secs + 1)); \
+		done; \
+		test -n "$${run_id}" || exit 201; \
+		gh run watch "$${run_id}" --interval ${SLEEP_SEC} --exit-status; \
+		exit; \
+	fi; \
+	gh pr checks --watch --interval ${SLEEP_SEC} || :
+
+web: .PHONY .SILENT
+	gh pr view --web
+
+merge: .PHONY
+	gh pr merge --squash --delete-branch

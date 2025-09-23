@@ -1,0 +1,88 @@
+---
+name: Build and Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Run Build and Tests
+    runs-on: ubuntu-24.04
+
+    env:
+      PROG: gibrash
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # 5.0.0
+        with:
+          fetch-depth: 0
+          show-progress: "false"
+
+      # https://github.com/marketplace/actions/conventional-commit-cocogitto-action#reference
+      - name: Install cocogitto
+        uses: cocogitto/cocogitto-action@c7a74f5406bab86da17da0f0e460a69f8219a68c # 3.11
+        with:
+          check: false
+          check-latest-tag-only: true
+          verify: false
+
+      - name: Get version
+        id: version
+        run: |
+          version=$(cog bump --auto --dry-run)
+          echo "version=${version#v}" >>"${GITHUB_OUTPUT}"
+
+      - name: Get commit hash
+        id: github
+        run: echo 'commit_hash=${{ github.sha }}' >>"${GITHUB_OUTPUT}"
+
+      - name: Update
+        run: sudo apt-get update --yes --quiet=2
+
+      - name: Install build necessities
+        run: |
+          sudo apt-get install --yes --quiet=2 \
+            --no-install-recommends --option DPkg::NoTriggers=true \
+            build-essential
+
+      - name: Install clang-tools
+        if: ${{ github.ref != 'refs/heads/main' }}
+        run: |
+          sudo apt-get install --yes --quiet=2 \
+            --no-install-recommends --option DPkg::NoTriggers=true \
+            clang-tools
+
+      - name: Build project
+        run: make VERSION=${{ steps.version.outputs.version }} COMMIT_HASH=${{ steps.github.outputs.commit_hash }}
+
+      - name: Strip binary
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: strip ${PROG}
+
+      - name: Test run
+        run: ./${PROG}
+
+      - name: Run scan-build
+        if: ${{ github.ref != 'refs/heads/main' }}
+        run: scan-build --use-cc=clang --status-bugs make
+
+      - name: Upload artifact bundle
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # 4.6.2
+        with:
+          name: ${{ env.PROG }}
+          path: |
+            LICENSE
+            ${{ env.PROG }}
+            ${{ env.PROG }}.1.gz
+            nfpm.yaml
+          retention-days: 1
+          compression-level: 9
+          overwrite: true
