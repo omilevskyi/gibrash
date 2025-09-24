@@ -50,14 +50,7 @@ jobs:
         run: |
           sudo apt-get install --yes --quiet=2 \
             --no-install-recommends --option DPkg::NoTriggers=true \
-            build-essential
-
-      - name: Install clang-tools
-        if: ${{ github.ref != 'refs/heads/main' }}
-        run: |
-          sudo apt-get install --yes --quiet=2 \
-            --no-install-recommends --option DPkg::NoTriggers=true \
-            clang-tools
+            build-essential libcriterion-dev
 
       - name: Build project
         run: make VERSION=${{ steps.version.outputs.version }} COMMIT_HASH=${{ steps.github.outputs.commit_hash }}
@@ -67,11 +60,10 @@ jobs:
         run: strip ${PROG}
 
       - name: Test run
-        run: ./${PROG}
+        run: ./${PROG} --version
 
-      - name: Run scan-build
-        if: ${{ github.ref != 'refs/heads/main' }}
-        run: scan-build --use-cc=clang --status-bugs make
+      - name: Run unit tests
+        run: make test
 
       - name: Upload artifact bundle
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}

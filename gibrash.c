@@ -1,3 +1,5 @@
+#include "include/gibrash.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -8,50 +10,7 @@
 #include <sys/param.h>
 #include <sys/stat.h>
 
-#include "include/gibrash.h"
-
-#ifndef PATH_DELIMITER
-#define PATH_DELIMITER "/"
-#endif
-
-#ifndef GIT_DIRECTORY
-#define GIT_DIRECTORY ".git"
-#endif
-
-#ifndef GIT_HEAD_FILE
-#define GIT_HEAD_FILE "HEAD"
-#endif
-
-#ifndef REFS_HEAD
-// "ref: refs/heads/"
-#define REFS_HEAD "refs/heads/"
-#endif
-
-#ifndef SHORT_HASH_LENGTH
-#define SHORT_HASH_LENGTH 7
-#endif
-
-// static int find_directory(char *path, const size_t path_size,
-//                           const char *directory) {
-//   char current_path[MAXPATHLEN];
-//   struct stat statbuf;
-//   for (;;) {
-//     if (getcwd(current_path, sizeof(current_path)) == NULL) {
-//       perror("getcwd()");
-//       return errno;
-//     }
-//     snprintf(path, path_size, "%s%s%s", current_path, PATH_DELIMITER,
-//              directory);
-//     if (stat(path, &statbuf) == 0 && S_ISDIR(statbuf.st_mode))
-//       return 0;
-//     if (current_path[1] == '\0' && current_path[0] == PATH_DELIMITER[0])
-//       return -2;
-//     if (chdir("..")) {
-//       perror("chdir()");
-//       return errno;
-//     }
-//   }
-// }
+#include "include/option_string.h"
 
 static int find_directory(char *path, const size_t path_size,
                           const char *directory) {
@@ -85,51 +44,19 @@ static int find_directory(char *path, const size_t path_size,
   }
 }
 
-// static int find_reference(char *result, const size_t result_size,
-//                           const char *path) {
-//   char file_path[MAXPATHLEN];
-//   snprintf(file_path, sizeof(file_path), "%s%s", path,
-//            PATH_DELIMITER GIT_HEAD_FILE);
-//   int fd = open(file_path, O_RDONLY);
-//   if (fd < 0)
-//     return errno;
-//   ssize_t bytes_read = read(fd, result, result_size - 1);
-//   if (bytes_read < 0) {
-//     errno_t rc = errno;
-//     if (close(fd))
-//       perror("close()");
-//     return rc;
-//   }
-//   result[bytes_read] = '\0';
-//   char *src = strcasestr(result, REFS_HEAD);
-//   if (src != NULL) {
-//     src += sizeof(REFS_HEAD) - 1;
-//     while (*src != '\0' && *src != '\n') {
-//       *result++ = *src++;
-//     };
-//     *result = '\0';
-//   } else
-//     result[SHORT_HASH_LENGTH] = '\0';
-//   if (close(fd))
-//     perror("close()");
-//   return 0;
-// }
-
 static int find_reference(char *result, const size_t result_size,
                           const char *path) {
   char file_path[MAXPATHLEN];
-  int fd;
-  ssize_t bytes_read;
 
   if ((size_t)snprintf(file_path, sizeof(file_path), "%s%c%s", path,
                        PATH_DELIMITER[0], GIT_HEAD_FILE) >= sizeof(file_path))
     return ENAMETOOLONG;
 
-  fd = open(file_path, O_RDONLY | O_CLOEXEC);
+  int fd = open(file_path, O_RDONLY | O_CLOEXEC);
   if (fd < 0)
     return errno;
 
-  bytes_read = pread(fd, result, result_size - 1, 0);
+  ssize_t bytes_read = read(fd, result, result_size - 1);
   if (bytes_read < 0) {
     int rc = errno;
     close(fd);
@@ -151,8 +78,51 @@ static int find_reference(char *result, const size_t result_size,
   return 0;
 }
 
-int main(void) {
+static int print_version(int rc) {
+  printf("%s %s (%s)\n", PROG, VERSION, COMMIT_HASH);
+  return rc;
+}
+
+static int print_usage(int rc) {
+  printf("Usage: %s\n"
+         "\n"
+         "Print the current git branch name in the fastest way.\n"
+         "It is mostly intended to be used in a bash prompt.\n"
+         "\n"
+         "Options:\n"
+         "      --version    Show version and exit\n"
+         "  -h, --help       Show this help and exit\n"
+         "\n",
+         PROG);
+  return rc;
+}
+
+int main(int argc, char **argv) {
   char path[MAXPATHLEN], ref_name[MAXPATHLEN + sizeof("ref: ")];
+
+  if (argc > 1) {
+    static struct option long_opts[] = {
+        {"help", no_argument, NULL, 'h'},
+        {"version", no_argument, NULL, 1},
+        {NULL, 0, NULL, 0},
+    };
+
+    int opt, opt_idx = 0;
+    char opt_string[option_string(long_opts, NULL, 0) + 1];
+    option_string(long_opts, opt_string, sizeof opt_string);
+
+    while ((opt = getopt_long(argc, argv, opt_string, long_opts, &opt_idx)) !=
+           -1) {
+      switch (opt) {
+      case 'h':
+        return print_usage(EXIT_SUCCESS);
+      case 1: /* --version */
+        return print_version(EXIT_SUCCESS);
+      default:
+        return print_usage(201);
+      }
+    }
+  }
 
   if (find_directory(path, sizeof(path), GIT_DIRECTORY) == 0 &&
       find_reference(ref_name, sizeof(ref_name), path) == 0)
