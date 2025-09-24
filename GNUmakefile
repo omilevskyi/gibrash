@@ -1,6 +1,6 @@
 PROG:=		gibrash
-SRCS:=		$(PROG).c
-HDRS:=		include/$(PROG).h
+SRCS:=		$(PROG).c option_string.c
+HDRS:=		include/$(PROG).h include/option_string.h
 OBJS:=		$(SRCS:.c=.o)
 
 CFLAGS= 	-O3 -pipe -flto -ffunction-sections -fdata-sections -fno-semantic-interposition
@@ -25,10 +25,13 @@ LDFLAGS+=	-Wl,--sort-common
 LDFLAGS+=	-Wl,-z,pack-relative-relocs
 LDFLAGS+=	-Wl,-z,defs
 
+TEST_CFLAGS:=	$(CFLAGS) -I.
+TEST_LDFLAGS:=	-lcriterion
+
 INSTALL:=	install
 INSTALL_BIN:=	$(INSTALL) -s -m 0755
 
-.PHONY: all clean install
+.PHONY: all clean test install
 
 all: $(PROG)
 
@@ -37,6 +40,13 @@ all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(CC) $(OBJS) -o $(PROG) $(LDFLAGS)
+
+test:
+	find test -type f -name '*.c' -print | while read -r f; do \
+		bin_file=$$(basename --suffix=.c $${f}); \
+		c_source=$${f#test/test_}; \
+		$(CC) $(TEST_CFLAGS) $(TEST_LDFLAGS) -o $${bin_file} $${f} $${c_source} && ./$${bin_file}; \
+	done
 
 install:
 	$(INSTALL_BIN) $(PROG) $(DESTDIR)$(PREFIX)/bin

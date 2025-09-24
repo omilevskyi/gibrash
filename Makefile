@@ -1,8 +1,10 @@
 PROG=		gibrash
 SRCS=		${PROG}.c include/${PROG}.h option_string.c include/option_string.h
-MAN=		man/${PROG}.1
+#MAN=		man/${PROG}.1
+MK_MAN=		no
 
-LLVM_DEFAULT?=	19
+LLVM_DEFAULT?=	21
+CC?=		clang${LLVM_DEFAULT}
 CLANG_FORMAT?=	clang-format${LLVM_DEFAULT}
 SCAN_BUILD?=	scan-build${LLVM_DEFAULT}
 CPPCHECK?=	cppcheck
@@ -53,7 +55,7 @@ CFLAGS+=	-I${LOCALBASE}/include
 
 LDFLAGS+=	-L${LOCALBASE}/lib
 
-#TEST_SRCS!=	find test -name '*.c' -type f
+TEST_SRCS!=	find test -name '*.c' -type f
 
 TEST_CFLAGS=	${CFLAGS:N-Wmissing-variable-declarations} -I.
 TEST_LDFLAGS=	-L${LOCALBASE}/lib -lcriterion
@@ -94,7 +96,7 @@ cppcheck: .PHONY
 		--suppress=checkersReport ${SRCS:M*.c}
 
 sanitize: .PHONY all
-	./${PROG} --list
+	./${PROG}
 
 .sinclude "Makefile.local"
 .include <bsd.prog.mk>
