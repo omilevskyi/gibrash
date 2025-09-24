@@ -16,13 +16,13 @@ _get_current_git_branch() {
 	test "_${s}" = _HEAD && s=$(git --no-pager rev-parse --short HEAD 2>/dev/null)
 	test -z "${s}" || echo " ${s} "
 }
-PS1="${RESET}\u${PS1_HOST}${CYAN}:${RESET}${BOLD}\w${RESET}\$(_get_current_git_branch)${PS1_TAIL_COLOR}>${RESET} "
+PS1="\u\h:\w\$(_get_current_git_branch)\$ "
 ```
 
 ## Verification of the authenticity
 
 ```sh
-export VERSION=0.0.1
+export VERSION=0.0.2
 cosign verify-blob \
   --certificate-identity https://github.com/omilevskyi/gibrash/.github/workflows/release.yml@refs/heads/main \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
