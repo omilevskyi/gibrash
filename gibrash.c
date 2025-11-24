@@ -1,3 +1,4 @@
+/**/
 #include "include/gibrash.h"
 
 #include <errno.h>
